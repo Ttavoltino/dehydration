@@ -10,7 +10,7 @@ DateTime myDT;
 LiquidCrystal_I2C lcd(0x27, 20, 04);
 //Constants
 #define DHTPIN 8
-#define DHTTYPE DHT22  // DHT 22  (AM2302)
+#define DHTTYPE DHT21  // DHT 22  (AM2302)
 #define numPins 5
 #define on HIGH
 #define off LOW
