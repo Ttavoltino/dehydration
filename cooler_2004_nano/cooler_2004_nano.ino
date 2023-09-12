@@ -137,13 +137,6 @@ void humCtrl() {
       cooler_set = false;
       dehumi_status = true;
       fanSpeed = true;
-      // if (temp <= temperature ) {
-      //   digitalWrite(Pin[1], on);
-      //   heat_status = true;
-      // } else /* if (temp >= (temperature + 0.9))*/ {
-      //   digitalWrite(Pin[1], off);
-      //   heat_status = false;
-      // }
     } else if (hum <= (humyditi + 2.5)) {
       compressor(off);
       cooler_set = true;
