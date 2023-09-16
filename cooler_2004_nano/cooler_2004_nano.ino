@@ -78,7 +78,7 @@ void setup() {
   lcd.setCursor(1, 1);
   lcd.print("By Martin Atanasov");
   lcd.setCursor(4, 2);
-  lcd.print("Ver. 1.3.3");
+  lcd.print("Ver. 1.3.4");
   for (byte i = 0; i < numPins; i++) {  //for each pin
     pinMode(Pin[i], OUTPUT);
     digitalWrite(Pin[i], off);
@@ -94,7 +94,7 @@ void loop() {
   myDT = RTClib::now();
   if ((millis() - lastTime) > timerDelay) {
 
-  hum = dht.readHumidity()-12;
+  hum = dht.readHumidity()-12.8;
   temp = dht.readTemperature();
 
   serialPrint();
