@@ -94,7 +94,7 @@ void loop() {
   myDT = RTClib::now();
   if ((millis() - lastTime) > timerDelay) {
 
-  hum = dht.readHumidity()-12;
+  hum = dht.readHumidity();
   temp = dht.readTemperature();
 
   serialPrint();
