@@ -16,7 +16,7 @@ Adafruit_BME280 bme;
 #define off LOW
 //Variables
 unsigned long lastTime = 0;
-unsigned long timerDelay = 2000;
+unsigned long timerDelay = 1000;
 int temperature = EEPROM.read(0);  // Set up  Temperature
 byte humyditi = EEPROM.read(4);     // Set up humidity
 bool state = EEPROM.read(5);        // True work like dehidratation False work for cooling
