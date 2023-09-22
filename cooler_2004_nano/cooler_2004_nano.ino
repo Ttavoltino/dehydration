@@ -2,19 +2,18 @@
 #include <EEPROM.h>
 #include <SPI.h>
 #include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BME280.h>
 #include <LiquidCrystal_I2C.h>
-#include <DHT.h>
 #include <DS3231.h>
 DS3231 myRTC;
 DateTime myDT;
 LiquidCrystal_I2C lcd(0x27, 20, 04);
+Adafruit_BME280 bme;
 //Constants
-#define DHTPIN 8
-#define DHTTYPE DHT21  // DHT 22  (AM2302)
 #define numPins 5
 #define on HIGH
 #define off LOW
-DHT dht(DHTPIN, DHTTYPE);  //// Initialize DHT sensor for normal 16mhz Arduino
 //Variables
 unsigned long lastTime = 0;
 unsigned long timerDelay = 2000;
@@ -78,13 +77,13 @@ void setup() {
   lcd.setCursor(1, 1);
   lcd.print("By Martin Atanasov");
   lcd.setCursor(4, 2);
-  lcd.print("Ver. 1.3.4");
+  lcd.print("Ver. 2.0.0");
   for (byte i = 0; i < numPins; i++) {  //for each pin
     pinMode(Pin[i], OUTPUT);
     digitalWrite(Pin[i], off);
   }
   myDT = RTClib::now();
-  dht.begin();
+  bme.begin(0x76);
   delay(3000);
   lcd.clear();
   compressorTs = (myDT.unixtime() + 120);
@@ -94,8 +93,8 @@ void loop() {
   myDT = RTClib::now();
   if ((millis() - lastTime) > timerDelay) {
 
-  hum = dht.readHumidity()-12.8;
-  temp = dht.readTemperature();
+  hum = bme.readHumidity();
+  temp = bme.readTemperature();
 
   serialPrint();
 
