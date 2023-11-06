@@ -16,7 +16,7 @@ Adafruit_BME280 bme;
 #define off LOW
 //Variables
 unsigned long lastTime = 0;
-unsigned long timerDelay = 1000;
+unsigned long timerDelay = 2000;
 int temperature = EEPROM.read(0);  // Set up  Temperature
 byte humyditi = EEPROM.read(4);     // Set up humidity
 bool state = EEPROM.read(5);        // True work like dehidratation False work for cooling
@@ -49,17 +49,18 @@ byte circSymbol [] = { 0x10, 0x11, 0x0A, 0x04, 0x10, 0x11, 0x0A, 0x04 };
 byte comprWaiting []=  {  0x0C, 0x0C, 0x0C, 0x0C, 0x0C, 0x00, 0x0C, 0x0C};
 void setup() {
   Wire.begin();
-  Serial.begin(115200);
+  Serial.begin(9600);
+  Serial.print("Loading");
   /*----------------------------------------------------------------------------
     In order to synchronise your clock module, insert timetable values below !
     ----------------------------------------------------------------------------*/
   // myRTC.setClockMode(false);
-  // myRTC.setHour(15);
-  // myRTC.setMinute(29);
+  // myRTC.setHour(21);
+  // myRTC.setMinute(14);
   // myRTC.setSecond(0);
 
-  // myRTC.setDate(21);
-  // myRTC.setMonth(6);
+  // myRTC.setDate(29);
+  // myRTC.setMonth(10);
   // myRTC.setYear(23);
   lcd.begin();
   lcd.createChar(0, downArrow);
@@ -77,15 +78,18 @@ void setup() {
   lcd.setCursor(1, 1);
   lcd.print("By Martin Atanasov");
   lcd.setCursor(4, 2);
-  lcd.print("Ver. 2.0.0");
+  lcd.print("Ver. 2.0.1");
   for (byte i = 0; i < numPins; i++) {  //for each pin
     pinMode(Pin[i], OUTPUT);
     digitalWrite(Pin[i], off);
+    delay(650);
+    Serial.print(".");
   }
   myDT = RTClib::now();
   bme.begin(0x76);
-  delay(3000);
+  //delay(3000);
   lcd.clear();
+   Serial.print("\n");
   compressorTs = (myDT.unixtime() + 120);
   
 }
@@ -95,6 +99,7 @@ void loop() {
 
   hum = bme.readHumidity();
   temp = bme.readTemperature();
+
 
   serialPrint();
 
@@ -111,11 +116,11 @@ void loop() {
 }
 void tempCtrl() {
   if (cooler_set) {
-    if (temp > (temperature + 0.9)) {
+    if (temp > (temperature + 2)) {
       hum_set = false;
       compressor(on);
       cooler_status = true;
-    } else if (temp <= (temperature + 0.5)) {
+    } else if (temp <= temperature) {
       compressor(off);
       cooler_status = false;
       hum_set = true;
@@ -143,7 +148,7 @@ void humCtrl() {
       //   digitalWrite(Pin[1], off);
       //   heat_status = false;
       // }
-    } else if (hum <= (humyditi + 2.5)) {
+    } else if (hum <= humyditi ) {
       compressor(off);
       cooler_set = true;
       dehumi_status = false;
