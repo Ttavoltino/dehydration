@@ -15,6 +15,7 @@ Adafruit_BME280 bme;
 #define on HIGH
 #define off LOW
 //Variables
+bool chkFan;
 unsigned long lastTime = 0;
 unsigned long timerDelay = 2000;
 int temperature = EEPROM.read(0);  // Set up  Temperature
@@ -38,7 +39,7 @@ bool fanSpeed = false;
 bool kompressor = true;
 bool fanOnOff = EEPROM.read(12);
 bool compressorWait = true ;
-const byte Pin[5] = { 3, 4, 5, 6, 7 };  //cooler, Heating, Humyfider, Circulation, fan_up_ctrl
+const byte Pin[5] = { 3, 4, 5, 6, 9 };  //cooler, Heating, Humyfider, Circulation, fan_up_ctrl
 byte downArrow[] = { 0x00, 0x04, 0x04, 0x04, 0x04, 0x1F, 0x0E, 0x04 };
 byte upArrow[] = { 0x04, 0x0E, 0x1F, 0x04, 0x04, 0x04, 0x04, 0x00 };
 byte heatSymbol [] = { 0x04, 0x02, 0x04, 0x08, 0x10, 0x08, 0x04, 0x1F };
@@ -158,7 +159,7 @@ void humCtrl() {
   if (hum <= (humyditi - 2.9) && state) {
     digitalWrite(Pin[2], on);
     humi_status = true;
-  } else /*if (hum >= (humyditi - 2.8))*/ {
+  } else if (hum >= (humyditi - 1)) {
     
     digitalWrite(Pin[2], off);
     humi_status = false;
@@ -169,50 +170,49 @@ void fanUpCtrl() {
   
   
   analogWrite(Pin[4], fan_up_speed);
-  digitalWrite(Pin[3], fanOnOff);
-  // bool chk;
-  // digitalWrite(Pin[3], fanOnOff); // WARNING
+
+  digitalWrite(Pin[3], fanOnOff); // WARNING
  
-  //  switch (myDT.hour()) {
+  //  switch (myDT.minute()) {
   //   case 0:
-  //     chk = true;
+  //     chkFan = true;
   //     break;
-  //   case 2:
-  //     chk = true;
+  //   case 15:
+  //     chkFan = true;
   //     break;
-  //   case 4:
-  //     chk = true;
+  //   case 30:
+  //     chkFan = true;
   //     break;
-  //   case 6:
-  //     chk = true;
-  //     break;
-  //   case 8:
-  //     chk = true;
-  //   case 10:
-  //     chk = true;
-  //     break;
-  //   case 12:
-  //     chk = true;
-  //     break;
-  //   case 14:
-  //     chk = true;
-  //     break;
-  //   case 16:
-  //     chk = true;
-  //     break;
-  //   case 18:
-  //     chk = true;
-  //     break;
-  //   case 20:
-  //     chk = true;
-  //     break;
-  //   case 22:
-  //     chk = true;
-  //     break;
+  //   case 45:
+  //   //   chkFan = true;
+  //   //   break;
+  //   // case 4:
+  //   //   chkFan = true;
+  //   // case 5:
+  //   //   chkFan = true;
+  //   //   break;
+  //   // case 12:
+  //   //   chkFan = true;
+  //   //   break;
+  //   // case 14:
+  //   //   chkFan = true;
+  //   //   break;
+  //   // case 16:
+  //   //   chkFan = true;
+  //   //   break;
+  //   // case 18:
+  //   //   chkFan = true;
+  //   //   break;
+  //   // case 21:
+  //   //   chkFan = true;
+  //   //   break;
+  //   // case 22:
+  //   //   chkFan = true;
+  //   //   break;
   //   default:
-  //     chk = false;
+  //     chkFan = false;
   // }
-  // if (chk && state && (myDT.minute() <=5)) {
+  // if (chkFan && state) {
   //   fanOnOff =EEPROM.read(12);
   // } else {
   //   fanOnOff =false;
