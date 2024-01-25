@@ -79,7 +79,7 @@ void setup() {
   lcd.setCursor(1, 1);
   lcd.print("By Martin Atanasov");
   lcd.setCursor(4, 2);
-  lcd.print("Ver. 2.0.1");
+  lcd.print("Ver. 2.1.3");
   for (byte i = 0; i < numPins; i++) {  //for each pin
     pinMode(Pin[i], OUTPUT);
     digitalWrite(Pin[i], off);
@@ -279,9 +279,9 @@ void serialPrint() {
     }
     Serial.print(" Fan/Speed:");
     if (fanOnOff) {
-      Serial.print("ON/");
-      Serial.print(fan_up_speed);
-      Serial.print(",");
+      Serial.print("ON / ");
+      Serial.print(map(fan_up_speed ,0 ,255 ,0 ,100));
+      Serial.print("%,");
     } else {
       Serial.print("OFF,");
     }
@@ -371,10 +371,12 @@ void lcdPrint() {
   }
   if (fanOnOff){
     lcd.setCursor(9, 3);
-    lcd.write(byte(6)); 
+    lcd.write(byte(6));
+    lcd.setCursor(10, 3);
+    lcd.print(map(fan_up_speed ,0 ,255 ,0 ,100));
   }
   if (compressorWait == false && (cooler_status || dehumi_status )){
-      lcd.setCursor(10, 3);
+      lcd.setCursor(14, 3);
       lcd.write(byte(7));
     }
 
@@ -413,8 +415,8 @@ void compressor(byte i) {
   }
 }
 void readSerial() {
-  String error = "Wrong Input\n";
-  String done = "DONE\n";
+  String error = " Wrong Input\n";
+  String done = " DONE\n";
   int pause = 3000;
   String enaDis[2] = { "Enable\n", "Disable\n" };
 
@@ -423,7 +425,7 @@ void readSerial() {
      Serial.read();
      //Serial.end();
     // Serial.begin(1152000);
-     Serial.print("MENU: \n1- Temperature Selection\n2- Humidity Selection\n3- Mode\n4- Reset Count Days\n5- Serial (Enable-Disable)\n6- Fan Speed 1-255\n7- Circulation FAN (ON-OFF) \n\n");
+     Serial.print("MENU: \n1- Temperature Selection\n2- Humidity Selection\n3- Mode\n4- Reset Count Days\n5- Serial (Enable-Disable)\n6- Fan Speed %\n7- Circulation FAN (ON-OFF) \n\n");
     while (Serial.available()==0) {};
    
     if (Serial.available()) {
@@ -481,11 +483,11 @@ void readSerial() {
         Serial.println(error);
       }
     } else if (a == 6) {
-      Serial.print("Fan Speed (1-255): ");
+      Serial.print("Fan Speed % (WARNING UNDER 10% Fan Stoped): ");
       while (!Serial.available()) {}
-      EEPROM.update(11, Serial.parseInt());
+      EEPROM.update(11, map(Serial.parseInt() ,0 , 100 ,0 ,255));
       fan_up_speed = EEPROM.read(11);
-      Serial.print(fan_up_speed);
+      Serial.print(map(fan_up_speed ,0 ,255 ,0 ,100));
       Serial.println(done);
       delay(pause);
 
