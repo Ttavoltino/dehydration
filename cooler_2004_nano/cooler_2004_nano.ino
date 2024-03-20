@@ -6,21 +6,28 @@
 #include <Adafruit_BME280.h>
 #include <LiquidCrystal_I2C.h>
 #include <DS3231.h>
+#include <OneWire.h> // tempsensor 
+#include <DallasTemperature.h> //temp sensor 
 DS3231 myRTC;
 DateTime myDT;
 LiquidCrystal_I2C lcd(0x27, 20, 04);
 Adafruit_BME280 bme;
 //Constants
-#define numPins 5
+#define numPins 6
 #define on HIGH
 #define off LOW
+#define ONE_WIRE_BUS 7
+
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
 //Variables
+int evTemp ;
 bool chkFan;
 unsigned long lastTime = 0;
 unsigned long timerDelay = 2000;
 int temperature = EEPROM.read(0);  // Set up  Temperature
 byte humyditi = EEPROM.read(4);     // Set up humidity
-bool state = EEPROM.read(5);        // True work like dehidratation False work for cooling
+byte state = EEPROM.read(5);        // True work like dehidratation False work for cooling
 float hum;                          //Stores humidity value
 float temp;                         //Stores temperature value
 uint32_t timeStamp = EEPROM.get(6, timeStamp);
@@ -32,14 +39,11 @@ bool cooler_status = false;
 bool dehumi_status = false;
 bool humi_status = false;
 bool heat_status = false;
-bool circulation_status = false;
 bool cooler_set = true;
 bool hum_set = true;
-bool fanSpeed = false;
 bool kompressor = true;
 bool fanOnOff = EEPROM.read(12);
-bool compressorWait = true ;
-const byte Pin[5] = { 3, 4, 5, 6, 9 };  //cooler, Heating, Humyfider, Circulation, fan_up_ctrl
+const byte Pin[numPins] = { 3, 4, 5, 6, 9, 8 };  //fan inner, Heating, Humyfider, Circulation, fan_up_ctrl, Compressor SSR
 byte downArrow[] = { 0x00, 0x04, 0x04, 0x04, 0x04, 0x1F, 0x0E, 0x04 };
 byte upArrow[] = { 0x04, 0x0E, 0x1F, 0x04, 0x04, 0x04, 0x04, 0x00 };
 byte heatSymbol [] = { 0x04, 0x02, 0x04, 0x08, 0x10, 0x08, 0x04, 0x1F };
@@ -48,6 +52,12 @@ byte dehumySymbol [] = { 0x00, 0x00, 0x04, 0x0E, 0x17, 0x17, 0x17, 0x0E };
 byte humySymbol [] = { 0x00, 0x00, 0x04, 0x0E, 0x1F, 0x1F, 0x1F, 0x0E };
 byte circSymbol [] = { 0x10, 0x11, 0x0A, 0x04, 0x10, 0x11, 0x0A, 0x04 };
 byte comprWaiting []=  {  0x0C, 0x0C, 0x0C, 0x0C, 0x0C, 0x00, 0x0C, 0x0C};
+const int tachoPin = 2;
+volatile unsigned long counter = 0;
+
+void countPulses() {
+  counter ++;
+}
 void setup() {
   Wire.begin();
   Serial.begin(9600);
@@ -56,14 +66,15 @@ void setup() {
     In order to synchronise your clock module, insert timetable values below !
     ----------------------------------------------------------------------------*/
   // myRTC.setClockMode(false);
-  // myRTC.setHour(21);
-  // myRTC.setMinute(14);
-  // myRTC.setSecond(0);
+  // myRTC.setHour(12);
+  // myRTC.setMinute(40);
+  // myRTC.setSecond(50);
 
-  // myRTC.setDate(29);
-  // myRTC.setMonth(10);
-  // myRTC.setYear(23);
+  // myRTC.setDate(25);
+  // myRTC.setMonth(2);
+  // myRTC.setYear(24);
   lcd.begin();
+  sensors.begin();
   lcd.createChar(0, downArrow);
   lcd.createChar(1, upArrow);
   lcd.createChar(2, heatSymbol);
@@ -79,7 +90,7 @@ void setup() {
   lcd.setCursor(1, 1);
   lcd.print("By Martin Atanasov");
   lcd.setCursor(4, 2);
-  lcd.print("Ver. 2.1.3");
+  lcd.print("Ver. 2.5.9");
   for (byte i = 0; i < numPins; i++) {  //for each pin
     pinMode(Pin[i], OUTPUT);
     digitalWrite(Pin[i], off);
@@ -90,9 +101,9 @@ void setup() {
   bme.begin(0x76);
   //delay(3000);
   lcd.clear();
-   Serial.print("\n");
+  Serial.print("\n");
   compressorTs = (myDT.unixtime() + 120);
-  
+  attachInterrupt(digitalPinToInterrupt(tachoPin), countPulses, FALLING);
 }
 void loop() {
   myDT = RTClib::now();
@@ -100,6 +111,8 @@ void loop() {
 
   hum = bme.readHumidity();
   temp = bme.readTemperature();
+  sensors.requestTemperatures(); 
+  evTemp = sensors.getTempCByIndex(0);
 
 
   serialPrint();
@@ -112,56 +125,65 @@ void loop() {
   tempCtrl();
   humCtrl();
   fanUpCtrl();
-  
   lcdPrint();
 }
-void tempCtrl() {
-  if (cooler_set) {
-    if (temp > (temperature + 2)) {
-      hum_set = false;
-      compressor(on);
-      cooler_status = true;
-    } else if (temp <= temperature) {
-      compressor(off);
-      cooler_status = false;
-      hum_set = true;
+void tempCtrl() { 
+  if ( state !=2){
+    if (cooler_set) {
+      if (temp >= (temperature +0.5)) {
+        hum_set = false;
+        coolerCtrl(on);
+        cooler_status = true;
+      } else if (temp <= (temperature -0.1)) {
+        coolerCtrl(off);
+        cooler_status = false;
+        hum_set = true;
+      }
     }
-  }
-  if (temp <= (temperature - 1)) {
-    digitalWrite(Pin[1], on);
-    heat_status = true;
-  } else if (temp >= temperature -0.5) {
+    if (temp <= (temperature - 1)) {
+      digitalWrite(Pin[1], on);
+      heat_status = true;
+    } else if (temp >= (temperature - 0.5)){
+      digitalWrite(Pin[1], off);
+      heat_status = false;
+    }
+  } else {
     digitalWrite(Pin[1], off);
-    heat_status = false;
+    coolerCtrl(off);
+    cooler_status = false;
   }
 }
 void humCtrl() {
-  if (hum_set) {
-    if (hum >= (humyditi + 2.9) && state) {
-      compressor(on);
-      cooler_set = false;
-      dehumi_status = true;
-      fanSpeed = true;
-      // if (temp <= temperature ) {
-      //   digitalWrite(Pin[1], on);
-      //   heat_status = true;
-      // } else /* if (temp >= (temperature + 0.9))*/ {
-      //   digitalWrite(Pin[1], off);
-      //   heat_status = false;
-      // }
-    } else if (hum <= humyditi ) {
-      compressor(off);
-      cooler_set = true;
-      dehumi_status = false;
-      fanSpeed = false;
+  if (state !=2){
+    if (hum_set) {
+      if (hum >= (humyditi + 2.9) && state==1) {
+        coolerCtrl(on);
+        cooler_set = false;
+        dehumi_status = true;
+        // if (temp <= temperature ) {
+        //   digitalWrite(Pin[1], on);
+        //   heat_status = true;
+        // } else /* if (temp >= (temperature + 0.9))*/ {
+        //   digitalWrite(Pin[1], off);
+        //   heat_status = false;
+        // }
+      } else if (hum <= humyditi ) {
+        coolerCtrl(off);
+        cooler_set = true;
+        dehumi_status = false;
+      }
     }
-  }
-  if (hum <= (humyditi - 2.9) && state) {
-    digitalWrite(Pin[2], on);
-    humi_status = true;
-  } else if (hum >= (humyditi - 1)) {
-    
+    if (hum <= (humyditi - 2.9) && state==1) {
+      digitalWrite(Pin[2], on);
+      humi_status = true;
+    } else if (hum >= (humyditi - 1)) {
+      
+      digitalWrite(Pin[2], off);
+      humi_status = false;
+    }
+  } else {
     digitalWrite(Pin[2], off);
+    dehumi_status = false;
     humi_status = false;
   }
   
@@ -222,16 +244,11 @@ void fanUpCtrl() {
 }
 void serialPrint() {
   if (serialStatus) {
+    long  rpm = counter * 23.48 / 2;
     Serial.print("Cooler:");
     if (cooler_status == true) {
 
       Serial.print("ON");
-      if (compressorWait == false){
-        Serial.print("!,");
-      }
-      else{
-        Serial.print(",");
-      }
     } else {
       Serial.print("OFF,");
     }
@@ -253,17 +270,13 @@ void serialPrint() {
     } else {
       Serial.print("OFF,");
     }
-    Serial.print(" FanHS:");
-    if (circulation_status == true) {
-      Serial.print("ON,");
-    } else {
-      Serial.print("OFF,");
-    }
     Serial.print(" Mode:");
-    if (state == true) {
+    if (state == 1) {
       Serial.print("Dehydrating,");
-    } else {
+    } else if (state == 0){
       Serial.print("Cooler/Freeze,");
+    } else if (state == 2){
+      Serial.print("OFF,");
     }
     Serial.print(" Humy:");
     if (hum_set == true) {
@@ -277,18 +290,19 @@ void serialPrint() {
     } else {
       Serial.print("Disabled,");
     }
-    Serial.print(" Fan/Speed:");
+    Serial.print(" Fan: ");
     if (fanOnOff) {
-      Serial.print("ON / ");
-      Serial.print(map(fan_up_speed ,0 ,255 ,0 ,100));
-      Serial.print("%,");
+      Serial.print(map(fan_up_speed ,26 ,255 ,1 ,100));
+      Serial.print("% ");
+    Serial.print(rpm);
+    Serial.print("rpm, ");
     } else {
       Serial.print("OFF,");
     }
-    Serial.print(" T:");
+    Serial.print("T:");
     Serial.print(temperature);
-    Serial.print(",");
-    Serial.print(" H:");
+    Serial.print(", ");
+    Serial.print("H:");
     Serial.print(humyditi);
     Serial.print(",");
     Serial.print(" Day/s:");
@@ -296,7 +310,10 @@ void serialPrint() {
     Serial.print("Hum:");
     Serial.print(hum);
     Serial.print("  Temp:");
-    Serial.println(temp);
+    Serial.print(temp);
+    Serial.print("  Evap Temp:");
+    Serial.println(evTemp); 
+    counter = 0;
   } else {
     if (serialCheck < 1){
     Serial.println("Serial Disabled, Enter 0 for MENU");
@@ -343,10 +360,12 @@ void lcdPrint() {
   }
   lcd.setCursor(0, 2);
   lcd.print("Mode:");
-  if (state) {
+  if (state==1) {
     lcd.print("Dehydr.");
-  } else {
+  } else if (state == 0) {
     lcd.print("Cooler ");
+  } else if (state == 2) {
+    lcd.print("OFF   ");
   }
   lcd.setCursor(13, 2);
   lcd.print("Day:");
@@ -372,19 +391,11 @@ void lcdPrint() {
   if (fanOnOff){
     lcd.setCursor(9, 3);
     lcd.write(byte(6));
-    lcd.setCursor(10, 3);
-    lcd.print(map(fan_up_speed ,0 ,255 ,0 ,100));
   }
-  if (compressorWait == false && (cooler_status || dehumi_status )){
-      lcd.setCursor(14, 3);
-      lcd.write(byte(7));
-    }
-
   // printDigitsLcd(cooler_status);
   // printDigitsLcd(dehumi_status);
   // printDigitsLcd(heat_status);
   // printDigitsLcd(humi_status);
-  // printDigitsLcd(circulation_status);
 }
 void printDigitsLcd(byte digits) {
   // utility function for digital clock display: prints preceding colon and leading 0
@@ -397,23 +408,35 @@ byte timeReturn() {
   return dayResult;
 }
 void compressor(byte i) {
-  if (myDT.unixtime() >= compressorTs) {
+  if (myDT.unixtime() >= compressorTs)   {
     if (i == HIGH) {
-      digitalWrite(Pin[0], on);
+      digitalWrite(Pin[5], on);
       kompressor = true;
     } else if (i == LOW) {
-      digitalWrite(Pin[0], off);
+      digitalWrite(Pin[5], off);
       if (kompressor == true) {
         compressorTs = (myDT.unixtime() + 120);
         delay(100);
         kompressor = false;
       }
     }
-    compressorWait = true;
-  } else {
-    compressorWait = false;
+   
   }
 }
+void coolerCtrl (byte i){
+  if (i == on){
+    digitalWrite(Pin[0], on);
+  } else {
+    digitalWrite(Pin[0], off);
+  }
+  if (evTemp >= 5 && i == on){
+    compressor(on);
+  } else {
+    compressor(off);
+  }
+
+}
+  
 void readSerial() {
   String error = " Wrong Input\n";
   String done = " DONE\n";
@@ -448,14 +471,16 @@ void readSerial() {
       Serial.println(done);
       delay(pause);
     } else if (a == 3) {
-      Serial.print("Mode(0 - Cooler/Freeze, 1-Dehydration): ");
+      Serial.print("Mode(0 - Cooler/Freeze, 1-Dehydration, 2-OFF): ");
       while (!Serial.available()) {}
       EEPROM.update(5, Serial.parseInt());
       state = EEPROM.read(5);
       if (state == 1) {
         Serial.println(" Dehydration ");
-      } else {
+      } else if (state == 0) {
         Serial.println(" Cooler/Freeze ");
+      } else if (state == 2) {
+        Serial.println(" OFF ");
       }
       Serial.println(done);
       delay(pause);
@@ -483,11 +508,11 @@ void readSerial() {
         Serial.println(error);
       }
     } else if (a == 6) {
-      Serial.print("Fan Speed % (WARNING UNDER 10% Fan Stoped): ");
+      Serial.print("Fan Speed %");
       while (!Serial.available()) {}
-      EEPROM.update(11, map(Serial.parseInt() ,0 , 100 ,0 ,255));
+      EEPROM.update(11, map(Serial.parseInt() ,1 , 100 ,26 ,255));
       fan_up_speed = EEPROM.read(11);
-      Serial.print(map(fan_up_speed ,0 ,255 ,0 ,100));
+      Serial.print(map(fan_up_speed ,26 ,255 ,1 ,100));
       Serial.println(done);
       delay(pause);
 
